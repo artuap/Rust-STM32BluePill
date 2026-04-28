@@ -1,0 +1,16 @@
+//*Cargo.toml Configuration
+Open the Cargo.toml file in your project's root directory and add the following lines under the [dependencies] section:*//
+
+[dependencies]
+# The Hardware Abstraction Layer specific for "Blue Pill"
+stm32f1xx-hal = { version = "0.10.0", features = ["rt", "stm32f103"] }
+
+# La capa de abstracción genérica (necesaria para que los drivers sean portables)
+embedded-hal = "1.0.0"
+
+# El driver para el sensor (compatible con embedded-hal)
+bmx280 = "0.5.0"
+
+# Necesario para manejar el inicio del microcontrolador (runtime)
+cortex-m = "0.7.7"
+cortex-m-rt = "0.7.3"
