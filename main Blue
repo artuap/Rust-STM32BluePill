@@ -1,0 +1,82 @@
+//it´s assumed dependencies stm32f1xx-hal, embedded-hal and a compatible driver such as bmx280 ´re on
+
+#![no_std]
+#![no_main]
+
+use panic_halt as _;
+use cortex_m_rt::entry; 
+use stm32f1xx_hal::{
+    i2c::{BlockingI2c, DutyCycle, Mode},
+    prelude::*,
+    pac,
+};
+// Use bme280 like driver base compatible
+use bme280::i2c::BME280; 
+
+#[entry]
+fn main() -> ! {
+    // Hardware Inicialitation
+    let cp = pac::CorePeripherals::take().unwrap();
+    let dp = pac::Peripheral::take().unwrap();
+
+    let mut flash = dp.FLASH.constrain();
+    let rcc = dp.RCC.constrain();
+    let clocks = rcc.cfgr.freeze(&mut flash.acr);
+
+    let mut afio = dp.AFIO.constrain();
+    let mut gpiob = dp.GPIOB.split();
+
+    // Configuration of I2C1 (SCL: PB6, SDA: PB7)
+    let scl = gpiob.pb6.into_alternate_open_drain(&mut gpiob.crh);
+    let sda = gpiob.pb7.into_alternate_open_drain(&mut gpiob.crh);
+
+    let i2c = BlockingI2c::i2c1(
+        dp.I2C1,
+        (scl, sda),
+        &mut afio.mapr,
+        Mode::Standard { frequency: 100.khz() },
+        clocks,
+        1000,
+        10,
+        1000,
+        1000,
+    );
+
+    // Sensor Initialize
+    let mut delay = cp.SYST.delay(&clocks);
+    let mut bme = BME280::new_primary(i2c);
+    bme.init(&mut delay).unwrap();
+
+    loop {
+        let measurements = bme.measure(&mut delay).unwrap();
+        
+        let t = measurements.temperature; // °C
+        let p_hpa = measurements.pressure / 100.0; // hPa
+        
+        // 1. Altitud aproximada (Fórmula simplificada para 2080 msnm)
+        // Usando presión a nivel del mar estándar 1013.25 hPa
+        let altitud = 44330.0 * (1.0 - (p_hpa / 1013.25).powf(1.0 / 5.255));
+
+        // 2. Conversión Presión hPa -> mmHg para la fórmula Ka
+        let p_mmhg = p_hpa * 0.750062;
+
+        // 3. Cálculo de Ka (Corrección Atmosférica)
+        // Basado en tu fórmula: Ka = (279.66 - (0.33273 * P) / (1 + 0.00366 * t)) * 10^-6
+        // Simplificando para obtener PPM directamente:
+        let numerador = 0.33273 * p_mmhg;
+        let denominador = 1.0 + (0.003661 * t);
+        let ka_ppm = 279.66 - (numerador / denominador);
+
+        // Imprimir resultados (Requiere configuración de ITM o UART para verlos)
+        // Formato pedido: PPM con dos enteros y un decimal (ej: 50.2)
+        // Nota: En no_std sin fpu completa, se recomienda usar escalado entero.
+        
+        // Simulación de salida formateada:
+        // Temp: t °C
+        // Pres: p_hpa hPa
+        // Alt: altitud m
+        // Corr: ka_ppm (formato XX.X)
+        
+        delay.delay_ms(2000u16);
+    }
+}
