@@ -4,4 +4,4 @@
 Blue pill from **ST Microelectronics** under HAL (Hardware Abstraction Layer) 
 #Cargo #CubeIDE #Sublime text editor
 Speed and secure embedded RUST LANG
-#rustacean #ferris #ownership
+#rustacean #ferris #ownership #cortex 
